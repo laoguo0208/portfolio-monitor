@@ -175,33 +175,58 @@ function getCodePrefix(code) {
     return 'sz';
 }
 
+// ============ 工具函数 ============
+function formatTime() {
+    const d = new Date();
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const s = String(d.getSeconds()).padStart(2, '0');
+    return h + ':' + m + ':' + s;
+}
+
+function safeSetText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+
+function safeSetClass(id, cls) {
+    const el = document.getElementById(id);
+    if (el) el.className = cls;
+}
+
+function safeSetStyle(id, prop, val) {
+    const el = document.getElementById(id);
+    if (el) el.style[prop] = val;
+}
+
 // ============ 数据获取 ============
 function fetchQuotes() {
     return new Promise((resolve, reject) => {
         const codes = PORTFOLIO.map(s => s.key).join(',');
-        const url = `https://qt.gtimg.cn/q=${codes}`;
+        const url = 'https://qt.gtimg.cn/q=' + codes;
         const script = document.createElement('script');
+        script.setAttribute('src', url);
+        script.setAttribute('charset', 'gbk');
 
-        script.src = url;
-        script.onload = () => {
-            setTimeout(() => {
-                const results = {};
-                PORTFOLIO.forEach(stock => {
-                    const varName = 'v_' + stock.key;
-                    const raw = window[varName];
+        script.onload = function() {
+            setTimeout(function() {
+                var results = {};
+                PORTFOLIO.forEach(function(stock) {
+                    var varName = 'v_' + stock.key;
+                    var raw = window[varName];
                     if (raw) {
-                        const parts = raw.split('~');
+                        var parts = raw.split('~');
                         if (parts.length >= 40) {
                             results[stock.key] = {
                                 name: parts[1],
-                                price: parseFloat(parts[3]),
-                                prevClose: parseFloat(parts[4]),
-                                open: parseFloat(parts[5]),
-                                volume: parseInt(parts[6]),
+                                price: parseFloat(parts[3]) || 0,
+                                prevClose: parseFloat(parts[4]) || 0,
+                                open: parseFloat(parts[5]) || 0,
+                                volume: parseInt(parts[6]) || 0,
                                 changeAmt: parseFloat(parts[31]) || 0,
                                 changePct: parseFloat(parts[32]) || 0,
-                                high: parseFloat(parts[33]) || parseFloat(parts[3]),
-                                low: parseFloat(parts[34]) || parseFloat(parts[3]),
+                                high: parseFloat(parts[33]) || parseFloat(parts[3]) || 0,
+                                low: parseFloat(parts[34]) || parseFloat(parts[3]) || 0,
                                 turnover: parseFloat(parts[38]) || 0,
                                 pe: parseFloat(parts[39]) || 0,
                                 amount: parseFloat(parts[37]) || 0,
@@ -209,11 +234,14 @@ function fetchQuotes() {
                         }
                     }
                 });
-                script.remove();
+                if (script.parentNode) script.parentNode.removeChild(script);
                 resolve(results);
-            }, 500);
+            }, 800);
         };
-        script.onerror = () => { script.remove(); reject(new Error('行情数据加载失败')); };
+        script.onerror = function() {
+            if (script.parentNode) script.parentNode.removeChild(script);
+            reject(new Error('行情数据加载失败'));
+        };
         document.head.appendChild(script);
     });
 }
@@ -248,17 +276,14 @@ function render(quotes) {
     rows.sort((a, b) => b.value - a.value);
     const totalPct = totalPrev > 0 ? (totalPnl / totalPrev * 100) : 0;
 
-    document.getElementById('totalValue').textContent = (totalValue / 10000).toFixed(1) + '万';
-    const pnlEl = document.getElementById('totalPnl');
-    pnlEl.textContent = (totalPnl > 0 ? '+' : '') + (totalPnl / 10000).toFixed(2) + '万';
-    pnlEl.className = 'value ' + (totalPnl >= 0 ? 'up' : 'down');
-    const pctEl = document.getElementById('totalPct');
-    pctEl.textContent = (totalPct > 0 ? '+' : '') + totalPct.toFixed(2) + '%';
-    pctEl.className = 'value ' + (totalPct >= 0 ? 'up' : 'down');
-    const alertEl = document.getElementById('alertCount');
-    alertEl.textContent = alertCount + '只';
-    alertEl.style.color = alertCount > 0 ? '#e74c3c' : '#2ecc71';
-    document.getElementById('updateTime').textContent = '更新: ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    safeSetText('totalValue', (totalValue / 10000).toFixed(1) + '万');
+    safeSetText('totalPnl', (totalPnl > 0 ? '+' : '') + (totalPnl / 10000).toFixed(2) + '万');
+    safeSetClass('totalPnl', 'value ' + (totalPnl >= 0 ? 'up' : 'down'));
+    safeSetText('totalPct', (totalPct > 0 ? '+' : '') + totalPct.toFixed(2) + '%');
+    safeSetClass('totalPct', 'value ' + (totalPct >= 0 ? 'up' : 'down'));
+    safeSetText('alertCount', alertCount + '只');
+    safeSetStyle('alertCount', 'color', alertCount > 0 ? '#e74c3c' : '#2ecc71');
+    safeSetText('updateTime', '更新: ' + formatTime());
 
     let tableHtml = `<div class="table-wrapper"><table>
         <thead><tr>
